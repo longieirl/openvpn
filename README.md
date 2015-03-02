@@ -201,4 +201,18 @@ sudo reboot
 sudo nano /var/log/openvpn.log
 ```
 
-Having exported HomeClientVPN.ovpn, use it now to confirm you client can connect. Once connected, good way to confirm you are connected, open http://www.whatsmyip.org/ and ensure the IP address is that of your home IP address.
+Having exported HomeClientVPN.ovpn, use it to confirm your client config is working. Once connected, a good way to ensure your connection is encrypted, open http://www.whatsmyip.org/ and ensure the IP address is that of your home IP address.
+
+# Adding more clients
+```
+cd /etc/openvpn/easy-rsa/keys
+./build-key Mates-ClientVPN
+openssl rsa -in Mates-ClientVPN.key -des3 -out Mates-ClientVPN.3des.key
+sudo ./MakeOVPN.sh
+```
+when prompted type in 'Mates-ClientVPN' and then send to your mate!!!
+```
+scp Mates-ClientVPN.ovpn root@host:/Users/jlong/Documents/VPN
+```
+
+
