@@ -210,7 +210,7 @@ cd /etc/openvpn/easy-rsa/keys
 openssl rsa -in Mates-ClientVPN.key -des3 -out Mates-ClientVPN.3des.key
 sudo ./MakeOVPN.sh
 ```
-when prompted type in 'Mates-ClientVPN' and then send to your mate!!!
+when prompted type in 'Mates-ClientVPN' and then send to your mate, dont forget the password used when you created the config!!!
 ```
 scp Mates-ClientVPN.ovpn root@host:/Users/jlong/Documents/VPN
 ```
