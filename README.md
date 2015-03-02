@@ -1,6 +1,7 @@
-# Configuration of OpenVPN on a Raspberry PI using ethernet. This has NOT been tested using wireless (wlan0).
+# Configuration of OpenVPN on a Raspberry PI using ethernet.
 
 # Prerequisites
+- This has NOT been tested using wireless (wlan0)
 - Open 1194 and enable UDP port forwarding on your router
 - Setup static IP address on PI i.e. 10.0.1.20 will be used in this tutorial
 
