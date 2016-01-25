@@ -10,7 +10,7 @@
 ```
 sudo apt-get install iptables openvpn
 sudo mkdir /etc/openvpn/easy-rsa/
-sudo cp -rf /usr/share/doc/openvpn/examples/easy-rsa/2.0/* /etc/openvpn/easy-rsa
+sudo cp -rf /usr/share/doc/openvpn/examples/sample-config-files/* /etc/openvpn/easy-rsa
 sudo chown -R $USER /etc/openvpn/easy-rsa/
 ```
 
