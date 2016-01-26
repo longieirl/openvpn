@@ -1,27 +1,34 @@
 # Configuration of OpenVPN and Easy-RSA v2.0 on a Raspberry PI using ethernet
 
 # Prerequisites
-- Assumes you are installing easy-rsa v2.0, v3.0 requires different steps - [https://community.openvpn.net/openvpn/wiki/EasyRSA]
+- Assumes you are installing easy-rsa v2.*
 - This has NOT been tested using wireless (wlan0)
 - Open 1194 and enable UDP port forwarding on your router
-- Setup static IP address on PI i.e. 10.0.1.20 will be used in this tutorial
+- Setup static IP address i.e. 10.0.1.20 will be used in this tutorial
 
-# Steps
-- Default setup steps
+# Initial Steps
+- Step1. Download and install required packages
 ```
-sudo apt-get install iptables openvpn
+sudo apt-get install iptables openvpn git
 sudo mkdir /etc/openvpn/easy-rsa/
 sudo cp -rf /usr/share/doc/openvpn/examples/easy-rsa/2.0/* /etc/openvpn/easy-rsa
+```
+
+- Step2. If the examples/easy-rsa folder is not available, then download and extract it from the OpenVPN repo
+```
+git clone -b release/2.x https://github.com/OpenVPN/easy-rsa.git ~/easy-rsa
+sudo cp -rf ~/easy-rsa/easy-rsa/2.0/* /etc/openvpn/easy-rsa
+```
+
+- Step3. Easy-rsa folder is setup, make it available to the logged in user! Ensure you are NOT logged in as root when doing this task!
+```
 sudo chown -R $USER /etc/openvpn/easy-rsa/
 ```
 
 - Open vars and edit the following values:
 ```
-sudo nano /etc/openvpn/easy-rsa/vars
-```
+sudo vi /etc/openvpn/easy-rsa/vars
 
-- Set the following values
-```
 export EASY_RSA="/etc/openvpn/easy-rsa"
 export KEY_SIZE=2048
 export KEY_COUNTRY="IE"
@@ -31,7 +38,7 @@ export KEY_ORG="Longie"
 export KEY_EMAIL="jlongieirl@gmail.com"
 ```
 
-- More commands
+- More commands, export environment variables and delete any previously created certificates
 ```
 cd /etc/openvpn/easy-rsa/
 source vars
@@ -39,25 +46,23 @@ source vars
 ln -s openssl-1.0.0.cnf openssl.cnf
 ```
 
-- Generate your master certificate and key
+- Generate master certificate and key, selecting enter for all options, change name to HomePI
 ```
 ./build-ca
+Name: HomePI
 ```
 
-- Use the following params:
-```
-Common name: HomePI
-Name: Jlong
-Email: jlongieirl@gmail.com
-```
-Note: 'ca.key' and 'ca.crt' created inside /etc/openvpn/easy-rsa/keys/
+__Note:__ 'ca.key' and 'ca.crt' is created inside /etc/openvpn/easy-rsa/keys/
 
-- Generate server certificates
+- Generate server certificates, selecting enter for all except for name and enter a challenge password
 ```
 /etc/openvpn/easy-rsa/build-key-server HomeServerVPN
+Name: HomePI
+Challenge Password: ****
 ```
 Note: All keys and certificates will be generated in /etc/openvpn/keys folder
-<b>KEEP THESE SECURE!!!!</b>
+
+<b>KEEP THESE KEYS SECURE!!!!</b>
 
 - Add another layer of protection, helps to prevent denial of service (DOS) attacks
 ```
@@ -65,13 +70,15 @@ cd /etc/openvpn/easy-rsa/
 openvpn --genkey --secret keys/ta.key
 ```
 
-- Generate client keys
+- Generate client keys, selecting enter for all options, change name to HomePI and challenge password 
 ```
 ./build-key HomeClientVPN
+Name: HomePI
+Challenge Password: ****
 ```
-Ensure a password is configured and accept 'Y' to all defaults
+__Note:__ Ensure a password is configured and accept 'Y' to all defaults
 
-- Encrypt the client private key using triple DES
+- Encrypt the client private key using triple DES, using the password used above
 ```
 cd /etc/openvpn/easy-rsa/keys
 openssl rsa -in HomeClientVPN.key -des3 -out HomeClientVPN.3des.key
@@ -79,18 +86,18 @@ openssl rsa -in HomeClientVPN.key -des3 -out HomeClientVPN.3des.key
 
 - Generate Diffie Hellman parameters, this one is used by OpenVPN for keys exchange
 ```
+cd /etc/openvpn/easy-rsa/
 ./build-dh
 ```
-Note: if you are lucky this step is fast otherwise it can take a while! Be patient.
+__Note:__ if you are lucky this step is fast otherwise it can take a while! Be patient....it will finish!
 
-Note: Root Certificate, Server Certificate and Client Certificates are now generated. Client files can be used BUT this tutorial will generate an OPVN config file to be used by Android/Tunnelblick applications.
-
-- Export these files if you dont want to have single config file.
+- Root Certificate, Server Certificate and Client Certificates are now generated. Client files can be used BUT this tutorial will generate an OPVN config file to be used by Android/Tunnelblick applications which will combine all three into one. So export them for later!
 ```
-scp ca.crt HomeClientVPN.key HomeClientVPN.crt root@whereever:/etc/openvpn
+cd /etc/openvpn/easy-rsa/keys
+scp ca.crt HomeClientVPN.key HomeClientVPN.crt root@some_other_server:/Users/jlong/Documents/secure
 ```
 
-- Setup Server config
+# Setup Server
 ```
 sudo cp /usr/share/doc/openvpn/examples/sample-config-files/server.conf.gz /etc/openvpn/
 sudo gzip -d /etc/openvpn/server.conf.gz
@@ -99,8 +106,8 @@ sudo nano /etc/openvpn/server.conf
 
 - Enable packet forwarding for IPv4
 ```
-sysctl -w net.ipv4.ip_forward=1
-sysctl -p
+sudo sysctl -w net.ipv4.ip_forward=1
+sudo sysctl -p
 ```
 
 <!--- Setup iptables-->
@@ -114,7 +121,7 @@ sysctl -p
 sudo nano /etc/firewall-openvpn-rules.sh
 ```
 
-- Add the following
+- Add the following, changing 'to-source' to the IP address of your machine
 ```
 #!/bin/sh 
 iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j SNAT --to-source 10.0.1.20
@@ -122,19 +129,19 @@ iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j SNAT --to-source 10.0.1
 
 - Update network interfaces
 ```
-sudo nano vim /etc/network/interfaces
+sudo vi /etc/network/interfaces
 ```
 
-- Add the following line to eth0
+- Find the following line and ensure the eth0 is static and not manual
 ```
 iface eth0 inet static
 	pre-up /etc/firewall-openvpn-rules.sh
 ```
 
-- Startup server
+- Startup server and sure the logs are running as expected
 ```
 sudo /etc/init.d/openvpn start
-sudo nano /var/log/openvpn.log
+sudo cat /var/log/openvpn.log
 ```
 
 - Ensure tunnel is setup correctly
@@ -153,12 +160,12 @@ tun0      Link encap:UNSPEC  HWaddr 00-00-00-00-00-00-00-00-00-00-00-00-00-00-00
 ```
 
 # Client files
-- Step 1, create default file:
+- Create default file
 ```
-nano /etc/openvpn/easy-rsa/keys/Default.txt
+vi /etc/openvpn/easy-rsa/keys/Default.txt
 ```
 
-Add the following:
+- Add the following, replacing YOUR_EXTERNAL_IP_ADDRESS with the web facing IP address
 ```
 client
 dev tun
@@ -193,13 +200,13 @@ Note: HomeClientVPN.ovpn is now generated and can exported allowing you to conne
 
 - Export file
 ```
-scp HomeClientVPN.ovpn root@host:/Users/jlong/Documents/VPN
+scp HomeClientVPN.ovpn root@some_other_server:/Users/jlong/Documents/VPN
 ```
 
-- Ensure everything works at startup!!!
+# Ensure everything works at startup!!!
 ```
 sudo reboot
-sudo nano /var/log/openvpn.log
+sudo cat /var/log/openvpn.log
 ```
 
 Having exported HomeClientVPN.ovpn, use it to confirm your client config is working. Once connected, a good way to ensure your connection is encrypted, open http://www.whatsmyip.org/ and ensure the IP address is that of your home IP address.
