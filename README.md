@@ -1,7 +1,7 @@
 # Configuration of OpenVPN and Easy-RSA v2.2 on a Raspberry PI using ethernet
 
 # Prerequisites
-- Assumes you are installing easy-rsa v2.2, v2.3 requires different steps
+- Assumes you are installing easy-rsa v2.2, v2.3 requires different steps - [https://community.openvpn.net/openvpn/wiki/EasyRSA]
 - This has NOT been tested using wireless (wlan0)
 - Open 1194 and enable UDP port forwarding on your router
 - Setup static IP address on PI i.e. 10.0.1.20 will be used in this tutorial
@@ -10,6 +10,7 @@
 - Default setup steps
 ```
 sudo apt-get install iptables openvpn
+apt-get install <package name>=<version>
 sudo mkdir /etc/openvpn/easy-rsa/
 sudo cp -rf /usr/share/doc/openvpn/examples/easy-rsa/2.0/* /etc/openvpn/easy-rsa
 sudo chown -R $USER /etc/openvpn/easy-rsa/
