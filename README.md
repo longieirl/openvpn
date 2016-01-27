@@ -1,15 +1,15 @@
 # Configuration of OpenVPN and Easy-RSA v2.0 on a Raspberry PI using ethernet
 
 # Prerequisites
-- Assumes you are installing easy-rsa v2.*
+- Assumes you are installing easy-rsa v2.*, different steps for v3.*
 - This has NOT been tested using wireless (wlan0)
-- Open 1194 and enable UDP port forwarding on your router
-- Setup static IP address i.e. 10.0.1.20 will be used in this tutorial
+- Setup static IP address i.e. 10.0.1.20 will be used in this tutorial. The router gives the IP address based on the MAC address of the device 'ifconfig eth0'
+- Open 1194 and enable UDP port forwarding on your router to the IP address 10.0.1.20
 
 # Initial Steps
 - Step1. Download and install required packages
 ```
-sudo apt-get install iptables openvpn git
+sudo apt-get install iptables openvpn git wget curl
 sudo mkdir /etc/openvpn/easy-rsa/
 sudo cp -rf /usr/share/doc/openvpn/examples/easy-rsa/2.0/* /etc/openvpn/easy-rsa
 ```
@@ -127,13 +127,10 @@ sudo nano /etc/firewall-openvpn-rules.sh
 iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j SNAT --to-source 10.0.1.20
 ```
 
-- Update network interfaces
+- Update network interfaces, find the following line and ensure the eth0 is static and not manual
 ```
 sudo vi /etc/network/interfaces
-```
 
-- Find the following line and ensure the eth0 is static and not manual
-```
 iface eth0 inet static
 	pre-up /etc/firewall-openvpn-rules.sh
 ```
@@ -148,6 +145,7 @@ sudo cat /var/log/openvpn.log
 ```
 ifconfig tun0
 ```
+
 Should look like the following:
 ````
 tun0      Link encap:UNSPEC  HWaddr 00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00  
@@ -160,17 +158,13 @@ tun0      Link encap:UNSPEC  HWaddr 00-00-00-00-00-00-00-00-00-00-00-00-00-00-00
 ```
 
 # Client files
-- Create default file
+- Copy the entire text, this will create the detault params. It assumes your machine has internet connectivity to run this.
 ```
-vi /etc/openvpn/easy-rsa/keys/Default.txt
-```
-
-- Add the following, replacing YOUR_EXTERNAL_IP_ADDRESS with the web facing IP address
-```
+cat << EOF > /etc/openvpn/easy-rsa/keys/Default.txt
 client
 dev tun
 proto udp
-remote YOUR_EXTERNAL_IP_ADDRESS 1194
+remote `curl -s http://myip.enix.org/REMOTE_ADDR` 1194
 resolv-retry infinite
 nobind
 persist-key
@@ -182,6 +176,7 @@ cipher AES-128-CBC
 comp-lzo
 verb 1
 mute 20
+EOF
 ```
 
 - Download generator file
