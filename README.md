@@ -54,27 +54,25 @@ Name: HomePI
 
 __Note:__ 'ca.key' and 'ca.crt' is created inside /etc/openvpn/easy-rsa/keys/
 
-- Generate server certificates, selecting enter for all except for name and enter a challenge password
+- Generate server certificates, selecting enter for all except for name and __DO NOT__ enter a challenge password
 ```
 /etc/openvpn/easy-rsa/build-key-server HomeServerVPN
 Name: HomePI
-Challenge Password: ****
 ```
 Note: All keys and certificates will be generated in /etc/openvpn/keys folder
 
 <b>KEEP THESE KEYS SECURE!!!!</b>
 
-- Add another layer of protection, helps to prevent denial of service (DOS) attacks
+- Add another layer of protection, helps to prevent denial of service (DoS) attacks
 ```
 cd /etc/openvpn/easy-rsa/
 openvpn --genkey --secret keys/ta.key
 ```
 
-- Generate client keys, selecting enter for all options, change name to HomePI and challenge password 
+- Generate client keys, selecting enter for all options, change name to HomePI and __DO NOT__ set a challenge password 
 ```
 ./build-key HomeClientVPN
 Name: HomePI
-Challenge Password: ****
 ```
 __Note:__ Ensure a password is configured and accept 'Y' to all defaults
 
@@ -104,7 +102,7 @@ sudo gzip -d /etc/openvpn/server.conf.gz
 sudo nano /etc/openvpn/server.conf
 ```
 
-- Enable packet forwarding for IPv4
+- Enable packet forwarding for IPv4, this will allow your device to act as relay to the internet. If you want to only access your local network, then leave this step out.
 ```
 sudo sysctl -w net.ipv4.ip_forward=1
 sudo sysctl -p
@@ -118,13 +116,18 @@ sudo sysctl -p
 
 - Setup firewall rules to be executed when network interface is loaded
 ```
-sudo nano /etc/firewall-openvpn-rules.sh
+sudo vi /etc/firewall-openvpn-rules.sh
 ```
 
 - Add the following, changing 'to-source' to the IP address of your machine
 ```
 #!/bin/sh 
 iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j SNAT --to-source 10.0.1.20
+```
+
+- Lock down the file
+```
+chmod +x /etc/firewall-openvpn-rules.sh
 ```
 
 - Update network interfaces, find the following line and ensure the eth0 is static and not manual
@@ -184,14 +187,14 @@ EOF
 cd /etc/openvpn/easy-rsa/keys
 wget --no-check-cert https://gist.githubusercontent.com/laurenorsini/10013430/raw/bd4b64e6ff717dc0d9284081fe3ca096947d0009/MakeOpenVPN.sh -O MakeOVPN.sh
 sudo chmod 700 /etc/openvpn/easy-rsa/keys/MakeOVPN.sh
-sudo nano /etc/openvpn/easy-rsa/keys/MakeOVPN.sh
 sudo ./MakeOVPN.sh
 ```
-When prompted, enter the following:
+
+- When prompted, enter the following:
 ```
 Client: HomeClientVPN
 ```
-Note: HomeClientVPN.ovpn is now generated and can exported allowing you to connect using Android or Tunnelblick
+__Note:__ HomeClientVPN.ovpn is now generated and can exported allowing you to connect using Android or Tunnelblick
 
 - Export file
 ```
@@ -204,6 +207,7 @@ sudo reboot
 sudo cat /var/log/openvpn.log
 ```
 
+# Add more clients
 Having exported HomeClientVPN.ovpn, use it to confirm your client config is working. Once connected, a good way to ensure your connection is encrypted, open http://www.whatsmyip.org/ and ensure the IP address is that of your home IP address.
 
 # Adding more clients
@@ -217,5 +221,3 @@ when prompted type in 'Mates-ClientVPN' and then send to your mate, dont forget 
 ```
 scp Mates-ClientVPN.ovpn root@host:/Users/jlong/Documents/VPN
 ```
-
-
