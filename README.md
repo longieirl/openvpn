@@ -1,7 +1,7 @@
 # Configuration of OpenVPN and Easy-RSA v2.0 on a Raspberry PI using ethernet
 
 # Prerequisites
-- Assumes you are installing easy-rsa v2.*, different steps for v3.*
+- Assumes you are installing easy-rsa v2, different steps for v3
 - This has NOT been tested using wireless (wlan0)
 - Setup static IP address i.e. 10.0.1.20 will be used in this tutorial. The router gives the IP address based on the MAC address of the device 'ifconfig eth0'
 - Open 1194 and enable UDP port forwarding on your router to the IP address 10.0.1.20
@@ -99,7 +99,7 @@ scp ca.crt HomeClientVPN.key HomeClientVPN.crt root@some_other_server:/Users/jlo
 ```
 sudo cp /usr/share/doc/openvpn/examples/sample-config-files/server.conf.gz /etc/openvpn/
 sudo gzip -d /etc/openvpn/server.conf.gz
-sudo nano /etc/openvpn/server.conf
+sudo vi /etc/openvpn/server.conf
 ```
 
 - Enable packet forwarding for IPv4, this will allow your device to act as relay to the internet. If you want to only access your local network, then leave this step out.
@@ -209,15 +209,14 @@ sudo cat /var/log/openvpn.log
 
 # Add more clients
 Having exported HomeClientVPN.ovpn, use it to confirm your client config is working. Once connected, a good way to ensure your connection is encrypted, open http://www.whatsmyip.org/ and ensure the IP address is that of your home IP address.
-
-# Adding more clients
 ```
 cd /etc/openvpn/easy-rsa/keys
 ./build-key Mates-ClientVPN
 openssl rsa -in Mates-ClientVPN.key -des3 -out Mates-ClientVPN.3des.key
 sudo ./MakeOVPN.sh
 ```
-when prompted type in 'Mates-ClientVPN' and then send to your mate, dont forget the password used when you created the config!!!
+
+- When prompted type in 'Mates-ClientVPN' and then send to your mate, dont forget the password used when you created the config!!!
 ```
 scp Mates-ClientVPN.ovpn root@host:/Users/jlong/Documents/VPN
 ```
