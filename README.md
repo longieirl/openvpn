@@ -3,6 +3,7 @@
 # Prerequisites
 - Assumes you are installing easy-rsa v2, different steps for v3
 - This has NOT been tested using wireless (wlan0)
+- Tested on a RaspPI Model 2
 - Setup static IP address i.e. 10.0.1.20 will be used in this tutorial. The router gives the IP address based on the MAC address of the device 'ifconfig eth0'
 - Open 1194 and enable UDP port forwarding on your router to the IP address 10.0.1.20
 
@@ -37,6 +38,7 @@ export KEY_CITY="Dublin"
 export KEY_ORG="Longie"
 export KEY_EMAIL="jlongieirl@gmail.com"
 export KEY_OU="ITDept"
+export KEY_OU="ITDept"
 ```
 
 - More commands, export environment variables and delete any previously created certificates. This is a fresh install so we'll remove any previous keys.
@@ -51,7 +53,6 @@ ln -s openssl-1.0.0.cnf openssl.cnf
 ```
 ./build-ca
 ```
-
 __Note:__ 'ca.key' and 'ca.crt' is created inside /etc/openvpn/easy-rsa/keys/
 
 - Generate server certificates, selecting enter for all and __DO NOT__ enter a challenge password
@@ -93,25 +94,40 @@ scp ca.crt HomeClientVPN.key HomeClientVPN.crt root@some_other_server:/Users/jlo
 ```
 
 # Setup Server
-- Copy over a default template
+- Generate server.conf, replace 10.0.1.20 with the IP address of your machine
 ```
-sudo cp /usr/share/doc/openvpn/examples/sample-config-files/server.conf.gz /etc/openvpn/
-sudo gzip -d /etc/openvpn/server.conf.gz
-sudo vi /etc/openvpn/server.conf
-```
-
-- Replace 10.0.1.20 with the IP address of your machine
-__Note:__ 8.8.8.8 is the DNS for Google and this setup is using 2048 bit encryption
-```
+sudo cat << EOF > ~/server.conf
 local 10.0.1.20
-dh dh2048.pem
-push "route 10.0.1.20 255.255.255.0"
-push "dhcp-option DNS 8.8.8.8"
-log /var/log/openvpn.log
+dev tun
+proto udp
+port 1194
+server 10.8.0.0 255.255.255.0 
 ca /etc/openvpn/easy-rsa/keys/ca.crt
 cert /etc/openvpn/easy-rsa/keys/HomeServerVPN.crt
 key /etc/openvpn/easy-rsa/keys/HomeServerVPN.key
 dh /etc/openvpn/easy-rsa/keys/dh2048.pem
+ifconfig 10.8.0.1 10.8.0.2 
+push "route 10.8.0.1 255.255.255.255" 
+push "route 10.8.0.0 255.255.255.0" 
+push "route 10.0.1.20 255.255.255.0"
+push "dhcp-option DNS 10.0.1.1" 
+push "redirect-gateway def1" 
+client-to-client
+duplicate-cn
+keepalive 10 120
+tls-auth /etc/openvpn/easy-rsa/keys/ta.key 0
+cipher AES-128-CBC
+comp-lzo
+user nobody
+group nogroup
+persist-key
+persist-tun
+status /var/log/openvpn-status.log
+log /var/log/openvpn.log
+verb 3
+EOF
+
+sudo cp ~/server.conf /etc/openvpn/
 ```
 
 - Enable packet forwarding for IPv4, this will allow your device to act as relay to the internet. If you want to only access your local network, then leave this step out.
@@ -139,7 +155,7 @@ iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j SNAT --to-source 10.0.1
 
 - Lock down the file
 ```
-sudo chmod +x /etc/firewall-openvpn-rules.sh
+sudo 700 /etc/firewall-openvpn-rules.sh 
 sudo chown root /etc/firewall-openvpn-rules.sh
 ```
 
@@ -155,6 +171,7 @@ iface eth0 inet static
 ```
 sudo /etc/init.d/openvpn start
 sudo tail -f /var/log/openvpn.log
+sudo tail -f /var/log/openvpn-status.log
 ```
 
 - Ensure tunnel is setup correctly
@@ -217,7 +234,7 @@ scp HomeClientVPN.ovpn root@some_other_server:/Users/jlong/Documents/VPN
 # Ensure everything works at startup!!!
 ```
 sudo reboot
-sudo cat /var/log/openvpn.log
+sudo tail -f /var/log/openvpn-status.log
 ```
 
 # Add more clients
