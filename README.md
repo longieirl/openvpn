@@ -1,28 +1,27 @@
-# Configuration of OpenVPN and Easy-RSA v2.0 on a Raspberry PI using ethernet
+# Configuration of OpenVPN and Easy-RSA v2.0 on a Raspberry PI
 
 # Prerequisites
-- Assumes you are installing easy-rsa v2, different steps for v3
-- This has NOT been tested using wireless (wlan0)
+- Assumes you are installing easy-rsa v2 which no longer has the easy-rsa bundled as part of the install
+- Do NOT setup this against the wireless card (wlan0)
 - Tested on a RaspPI Model 2
-- Setup static IP address i.e. 10.0.1.20 will be used in this tutorial. The router gives the IP address based on the MAC address of the device 'ifconfig eth0'
 - Open 1194 and enable UDP port forwarding on your router to the IP address 10.0.1.20
 
-# Initial Steps
-- Step1. Download and install required packages
 ```
-sudo apt-get install iptables openvpn git wget curl
-sudo mkdir /etc/openvpn/easy-rsa/
-sudo cp -rf /usr/share/doc/openvpn/examples/easy-rsa/2.0/* /etc/openvpn/easy-rsa
+Gateway/Internet Router: 10.0.1.1
+Subnet Mask: 255.255.255.0
+Static IP: 10.0.1.20
+Router gives out DHCP range: 10.0.100-200
+dns-nameservers 8.8.8.8 8.8.4.4
 ```
 
-- Step2. If the examples/easy-rsa folder is not available, then download and extract it from the OpenVPN repo
+# Initial Steps
+- Download, configure and setup environment
+- Note: easy-rsa is no longer available in the openvpn bundle
 ```
+sudo apt-get -y install iptables openvpn git wget curl
+sudo mkdir /etc/openvpn/easy-rsa/
 git clone -b release/2.x https://github.com/OpenVPN/easy-rsa.git ~/easy-rsa
 sudo cp -rf ~/easy-rsa/easy-rsa/2.0/* /etc/openvpn/easy-rsa
-```
-
-- Step3. Easy-rsa folder is setup, make it available to the logged in user! Ensure you are NOT logged in as root when doing this task!
-```
 sudo chown -R $USER /etc/openvpn/easy-rsa/
 ```
 
@@ -57,7 +56,7 @@ __Note:__ 'ca.key' and 'ca.crt' is created inside /etc/openvpn/easy-rsa/keys/
 
 - Generate server certificates, selecting enter for all and __DO NOT__ enter a challenge password
 ```
-/etc/openvpn/easy-rsa/build-key-server HomeServerVPN
+/etc/openvpn/easy-rsa/build-key-server server
 ```
 Note: All keys and certificates will be generated in /etc/openvpn/keys folder. Please note the name of the server used here.
 
@@ -101,17 +100,25 @@ local 10.0.1.20
 dev tun
 proto udp
 port 1194
-server 10.8.0.0 255.255.255.0 
 ca /etc/openvpn/easy-rsa/keys/ca.crt
-cert /etc/openvpn/easy-rsa/keys/HomeServerVPN.crt
-key /etc/openvpn/easy-rsa/keys/HomeServerVPN.key
+cert /etc/openvpn/easy-rsa/keys/server.crt
+key /etc/openvpn/easy-rsa/keys/server.key
 dh /etc/openvpn/easy-rsa/keys/dh2048.pem
-ifconfig 10.8.0.1 10.8.0.2 
-push "route 10.8.0.1 255.255.255.255" 
-push "route 10.8.0.0 255.255.255.0" 
+server 10.8.0.0 255.255.255.0
+# server and remote endpoints
+ifconfig 10.8.0.1 10.8.0.2
+# Add route to Client routing table for the OpenVPN Server
+push "route 10.8.0.1 255.255.255.255"
+# Add route to Client routing table for the OPenVPN Subnet
+push "route 10.8.0.0 255.255.255.0"
+# your local subnet
 push "route 10.0.1.20 255.255.255.0"
-push "dhcp-option DNS 10.0.1.1" 
-push "redirect-gateway def1" 
+# Set your primary domain name server address to Google DNS 8.8.8.8
+push "dhcp-option DNS 8.8.8.8"
+# Override the Client default gateway by using 0.0.0.0/1 and
+# 128.0.0.0/1 rather than 0.0.0.0/0. This has the benefit of
+# overriding but not wiping out the original default gateway.
+push "redirect-gateway def1"
 client-to-client
 duplicate-cn
 keepalive 10 120
@@ -122,17 +129,20 @@ user nobody
 group nogroup
 persist-key
 persist-tun
-status /var/log/openvpn-status.log
+status /var/log/openvpn-status.log 20
 log /var/log/openvpn.log
-verb 3
+verb 1
 EOF
+```
 
+- Copy the new file over to the correct directory
+```
 sudo cp ~/server.conf /etc/openvpn/
 ```
 
 - Enable packet forwarding for IPv4, this will allow your device to act as relay to the internet. If you want to only access your local network, then leave this step out.
 ```
-sudo sysctl -w net.ipv4.ip_forward=1
+sudo /bin/su -c "echo -e '\n#Enable IP Routing\nnet.ipv4.ip_forward = 1' >> /etc/sysctl.conf"
 sudo sysctl -p
 ```
 
@@ -147,7 +157,7 @@ sudo sysctl -p
 sudo vi /etc/firewall-openvpn-rules.sh
 ```
 
-- Add the following, changing 'to-source' to the IP address of your machine
+- Add the following, changing 'to-source' to the IP address to 10.0.20
 ```
 #!/bin/sh 
 iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j SNAT --to-source 10.0.1.20
@@ -164,8 +174,14 @@ sudo chown root /etc/firewall-openvpn-rules.sh
 sudo vi /etc/network/interfaces
 
 iface eth0 inet static
-	pre-up /etc/firewall-openvpn-rules.sh
+    pre-up /etc/firewall-openvpn-rules.sh
 ```
+
+- Test everything is working
+```
+sudo openvpn --config /etc/openvpn/server.conf
+```
+
 
 - Startup server and sure the logs are running as expected
 ```
@@ -191,7 +207,7 @@ tun0      Link encap:UNSPEC  HWaddr 00-00-00-00-00-00-00-00-00-00-00-00-00-00-00
 ```
 
 # Client files
-- Copy the entire text, this will create the detault params. It assumes your machine has internet connectivity to run this.
+- Copy the entire text, this will create the detault params. It assumes your machine has internet connectivity to run this!
 ```
 cat << EOF > /etc/openvpn/easy-rsa/keys/Default.txt
 client
@@ -212,32 +228,31 @@ mute 20
 EOF
 ```
 
-- Download generator file
+- Download MakeOVPN generator, when prompted, enter the following: 'HomeClientVPN'
 ```
 cd /etc/openvpn/easy-rsa/keys
 wget --no-check-cert https://gist.githubusercontent.com/laurenorsini/10013430/raw/bd4b64e6ff717dc0d9284081fe3ca096947d0009/MakeOpenVPN.sh -O MakeOVPN.sh
 sudo chmod 700 /etc/openvpn/easy-rsa/keys/MakeOVPN.sh
 sudo ./MakeOVPN.sh
 ```
-
-- When prompted, enter the following:
-```
-Client: HomeClientVPN
-```
 __Note:__ HomeClientVPN.ovpn is now generated and can exported allowing you to connect using Android or Tunnelblick
 
-- Export file
+- Export client file to a location to be consumed by devices
 ```
-scp HomeClientVPN.ovpn root@some_other_server:/Users/jlong/Documents/VPN
+scp HomeClientVPN.ovpn root@some_other_server:/Users/user/folder
 ```
 
-# Ensure everything works at startup!!!
+# Restart to test everything is working
 ```
 sudo reboot
-sudo tail -f /var/log/openvpn-status.log
 ```
 
-# Add more clients
+- On restart, ensure everything is working
+```
+sudo tail -f /var/log/openvpn.log
+```
+
+# Adding more clients
 Having exported HomeClientVPN.ovpn, use it to confirm your client config is working. Once connected, a good way to ensure your connection is encrypted, open http://www.whatsmyip.org/ and ensure the IP address is that of your home IP address.
 ```
 cd /etc/openvpn/easy-rsa/keys
