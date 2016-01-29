@@ -11,7 +11,7 @@ Gateway/Internet Router: 10.0.1.1
 Subnet Mask: 255.255.255.0
 Static IP: 10.0.1.20
 Router gives out DHCP range: 10.0.100-200
-dns-nameservers 8.8.8.8 8.8.4.4
+dns-nameservers 10.0.1.1
 ```
 
 # Initial Steps
@@ -30,13 +30,12 @@ sudo chown -R $USER /etc/openvpn/easy-rsa/
 sudo vi /etc/openvpn/easy-rsa/vars
 
 export EASY_RSA="/etc/openvpn/easy-rsa"
-export KEY_SIZE=2048
+export KEY_SIZE=1024
 export KEY_COUNTRY="IE"
 export KEY_PROVINCE="DU"
 export KEY_CITY="Dublin"
 export KEY_ORG="Longie"
 export KEY_EMAIL="jlongieirl@gmail.com"
-export KEY_OU="ITDept"
 export KEY_OU="ITDept"
 ```
 
@@ -75,13 +74,13 @@ openvpn --genkey --secret keys/ta.key
 
 - Encrypt the client private key using triple DES, please remember the password used here. If no password is created then the steps below wont work!
 ```
-cd /etc/openvpn/easy-rsa/keys
+cd keys
 openssl rsa -in HomeClientVPN.key -des3 -out HomeClientVPN.3des.key
 ```
 
 - Generate Diffie Hellman parameters, this one is used by OpenVPN for keys exchange
 ```
-cd /etc/openvpn/easy-rsa/
+cd ..
 ./build-dh
 ```
 __Note:__ Be patient....it will finish, since we are using 2048-bit encryption it can take an hour, if you use 1024 it will take five minutes.
@@ -96,14 +95,15 @@ scp ca.crt HomeClientVPN.key HomeClientVPN.crt root@some_other_server:/Users/jlo
 - Generate server.conf, replace 10.0.1.20 with the IP address of your machine
 ```
 sudo cat << EOF > ~/server.conf
-local 10.0.1.20
+local 10.0.1.20 255.255.255.0
 dev tun
 proto udp
 port 1194
+# Certs and Keys generated
 ca /etc/openvpn/easy-rsa/keys/ca.crt
 cert /etc/openvpn/easy-rsa/keys/server.crt
 key /etc/openvpn/easy-rsa/keys/server.key
-dh /etc/openvpn/easy-rsa/keys/dh2048.pem
+dh /etc/openvpn/easy-rsa/keys/dh1024.pem
 server 10.8.0.0 255.255.255.0
 # server and remote endpoints
 ifconfig 10.8.0.1 10.8.0.2
@@ -113,8 +113,8 @@ push "route 10.8.0.1 255.255.255.255"
 push "route 10.8.0.0 255.255.255.0"
 # your local subnet
 push "route 10.0.1.20 255.255.255.0"
-# Set your primary domain name server address to Google DNS 8.8.8.8
-push "dhcp-option DNS 8.8.8.8"
+# Set your primary domain name server address
+push "dhcp-option DNS 10.0.1.1"
 # Override the Client default gateway by using 0.0.0.0/1 and
 # 128.0.0.0/1 rather than 0.0.0.0/0. This has the benefit of
 # overriding but not wiping out the original default gateway.
@@ -131,7 +131,7 @@ persist-key
 persist-tun
 status /var/log/openvpn-status.log 20
 log /var/log/openvpn.log
-verb 1
+verb 3
 EOF
 ```
 
@@ -165,7 +165,7 @@ iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j SNAT --to-source 10.0.1
 
 - Lock down the file
 ```
-sudo 700 /etc/firewall-openvpn-rules.sh 
+sudo chmod 700 /etc/firewall-openvpn-rules.sh 
 sudo chown root /etc/firewall-openvpn-rules.sh
 ```
 
@@ -177,17 +177,14 @@ iface eth0 inet static
     pre-up /etc/firewall-openvpn-rules.sh
 ```
 
-- Test everything is working
+- Ensure the rules are applied at startup
 ```
-sudo openvpn --config /etc/openvpn/server.conf
+sed -i -e '$i \/etc/firewall-openvpn-rules.sh\n' /etc/rc.local
 ```
-
 
 - Startup server and sure the logs are running as expected
 ```
 sudo /etc/init.d/openvpn start
-sudo tail -f /var/log/openvpn.log
-sudo tail -f /var/log/openvpn-status.log
 ```
 
 - Ensure tunnel is setup correctly
@@ -206,6 +203,12 @@ tun0      Link encap:UNSPEC  HWaddr 00-00-00-00-00-00-00-00-00-00-00-00-00-00-00
           RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
 ```
 
+- Any issues, tail the logs
+```
+sudo tail -f /var/log/openvpn.log
+sudo tail -f /var/log/openvpn-status.log
+```
+
 # Client files
 - Copy the entire text, this will create the detault params. It assumes your machine has internet connectivity to run this!
 ```
@@ -219,8 +222,7 @@ nobind
 persist-key
 persist-tun
 mute-replay-warnings
-ns-cert-type server
-key-direction 1 
+key-direction 1
 cipher AES-128-CBC
 comp-lzo
 verb 1
