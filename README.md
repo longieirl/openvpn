@@ -208,7 +208,7 @@ ifconfig tun0
 ```
 
 - You should see the following output
-````
+```
 tun0      Link encap:UNSPEC  HWaddr 00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00  
           inet addr:10.8.0.1  P-t-P:10.8.0.2  Mask:255.255.255.255
           UP POINTOPOINT RUNNING NOARP MULTICAST  MTU:1500  Metric:1
