@@ -1,5 +1,9 @@
 # Configuration of OpenVPN and Easy-RSA v2.0 on a Raspberry PI
 
+Wizard setup:
+http://kamilslab.com/2017/01/22/how-to-turn-your-raspberry-pi-into-a-home-vpn-server-using-pivpn/
+
+
 # Prerequisites
 - Assumes you are installing easy-rsa v2 which no longer has the easy-rsa bundled as part of the install
 - Do NOT setup this against the wireless card (wlan0)
